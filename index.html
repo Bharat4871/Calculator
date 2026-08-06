@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no"/>
+  <meta name="mobile-web-app-capable" content="yes"/>
+  <meta name="apple-mobile-web-app-capable" content="yes"/>
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+  <meta name="theme-color" content="#0f0f11"/>
+  <title>Calculator</title>
+  <link rel="manifest" id="manifest-link"/>
+  <link rel="apple-touch-icon" href="./icon-192.png"/>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Inter:wght@300;400;500&display=swap" rel="stylesheet"/>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html, body {
+      height: 100%;
+      width: 100%;
+      overflow: hidden;
+      background: #0f0f11;
+    }
+
+    body {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-end;
+      font-family: 'Inter', sans-serif;
+      padding: env(safe-area-inset-top, 0px) 0 env(safe-area-inset-bottom, 0px);
+    }
+
+    .calc-wrap {
+      width: 100%;
+      max-width: 420px;
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+      justify-content: flex-end;
+    }
+
+    .display {
+      background: #0f0f11;
+      padding: 0 24px 16px;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-end;
+    }
+
+    .history {
+      font-family: 'DM Mono', monospace;
+      font-size: 14px;
+      color: #44444e;
+      min-height: 22px;
+      text-align: right;
+      margin-bottom: 8px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .screen {
+      font-family: 'DM Mono', monospace;
+      font-size: clamp(36px, 10vw, 56px);
+      font-weight: 300;
+      color: #f0f0f5;
+      text-align: right;
+      letter-spacing: -0.02em;
+      line-height: 1;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      padding-bottom: 12px;
+    }
+    .screen.small  { font-size: clamp(28px, 8vw, 40px); }
+    .screen.xsmall { font-size: clamp(20px, 6vw, 30px); }
+
+    .keys {
+      background: #131316;
+      border-top: 1px solid #1e1e24;
+      padding: 14px 16px calc(14px + env(safe-area-inset-bottom, 0px));
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 10px;
+    }
+
+    button {
+      border: none;
+      cursor: pointer;
+      border-radius: 16px;
+      font-family: 'Inter', sans-serif;
+      font-size: clamp(16px, 5vw, 22px);
+      font-weight: 400;
+      height: clamp(60px, 15vw, 78px);
+      transition: transform 80ms ease, opacity 100ms;
+      outline: none;
+      user-select: none;
+      -webkit-tap-highlight-color: transparent;
+      touch-action: manipulation;
+    }
+
+    button:active { transform: scale(0.91); opacity: 0.8; }
+
+    .btn-num {
+      background: #1e1e23;
+      color: #e8e8f0;
+    }
+
+    .btn-zero {
+      grid-column: span 2;
+      text-align: left;
+      padding-left: clamp(20px, 6vw, 28px);
+    }
+
+    .btn-op {
+      background: #252530;
+      color: #9090c0;
+      font-size: clamp(18px, 6vw, 26px);
+    }
+
+    .btn-fn {
+      background: #1e1e28;
+      color: #7070a0;
+      font-size: clamp(13px, 4vw, 17px);
+      font-weight: 500;
+      letter-spacing: 0.02em;
+    }
+
+    .btn-eq {
+      background: #5a4fcf;
+      color: #ffffff;
+      font-size: clamp(18px, 6vw, 26px);
+    }
+
+    @keyframes shake {
+      0%,100% { transform: translateX(0); }
+      20%,60%  { transform: translateX(-6px); }
+      40%,80%  { transform: translateX(6px); }
+    }
+    .screen.error { animation: shake 300ms ease; color: #e05060; }
+
+    /* Install banner */
+    #install-banner {
+      display: none;
+      position: fixed;
+      top: 0; left: 0; right: 0;
+      background: #5a4fcf;
+      color: white;
+      padding: 12px 16px;
+      font-size: 14px;
+      text-align: center;
+      z-index: 99;
+      cursor: pointer;
+      gap: 8px;
+      align-items: center;
+      justify-content: center;
+    }
+    #install-banner.show { display: flex; }
+    #install-banner span { font-weight: 600; }
+  </style>
+</head>
+<body>
+
+<div id="install-banner" onclick="installApp()">
+  📲 <span>Add to Home Screen</span> — use as an app!
+  <button onclick="event.stopPropagation();document.getElementById('install-banner').classList.remove('show')"
+    style="background:transparent;color:white;border:none;font-size:18px;cursor:pointer;margin-left:8px;padding:0;height:auto;">✕</button>
+</div>
+
+<div class="calc-wrap">
+  <div class="display">
+    <div class="history" id="history"></div>
+    <div class="screen" id="screen">0</div>
+  </div>
+  <div class="keys">
+    <button class="btn-fn" data-action="clear">AC</button>
+    <button class="btn-fn" data-action="sign">+/−</button>
+    <button class="btn-fn" data-action="percent">%</button>
+    <button class="btn-op" data-action="op" data-op="÷">÷</button>
+
+    <button class="btn-num" data-action="num" data-num="7">7</button>
+    <button class="btn-num" data-action="num" data-num="8">8</button>
+    <button class="btn-num" data-action="num" data-num="9">9</button>
+    <button class="btn-op" data-action="op" data-op="×">×</button>
+
+    <button class="btn-num" data-action="num" data-num="4">4</button>
+    <button class="btn-num" data-action="num" data-num="5">5</button>
+    <button class="btn-num" data-action="num" data-num="6">6</button>
+    <button class="btn-op" data-action="op" data-op="−">−</button>
+
+    <button class="btn-num" data-action="num" data-num="1">1</button>
+    <button class="btn-num" data-action="num" data-num="2">2</button>
+    <button class="btn-num" data-action="num" data-num="3">3</button>
+    <button class="btn-op" data-action="op" data-op="+">+</button>
+
+    <button class="btn-num btn-zero" data-action="num" data-num="0">0</button>
+    <button class="btn-num" data-action="decimal">.</button>
+    <button class="btn-eq" data-action="equals">=</button>
+  </div>
+</div>
+
+<script>
+  // Inject manifest dynamically (works on any hosting path)
+  const manifestData = {
+    name: "Calculator",
+    short_name: "Calc",
+    description: "A simple, clean calculator app",
+    start_url: "./",
+    display: "standalone",
+    background_color: "#0f0f11",
+    theme_color: "#0f0f11",
+    orientation: "portrait",
+    icons: [
+      { src: "./icon-192.png", sizes: "192x192", type: "image/png", purpose: "any maskable" },
+      { src: "./icon-512.png", sizes: "512x512", type: "image/png", purpose: "any maskable" }
+    ]
+  };
+  const blob = new Blob([JSON.stringify(manifestData)], {type: 'application/json'});
+  document.getElementById('manifest-link').href = URL.createObjectURL(blob);
+
+  // Service worker
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('./sw.js').catch(() => {});
+  }
+
+  // PWA install prompt
+  let deferredPrompt;
+  window.addEventListener('beforeinstallprompt', e => {
+    e.preventDefault();
+    deferredPrompt = e;
+    document.getElementById('install-banner').classList.add('show');
+  });
+  window.addEventListener('appinstalled', () => {
+    document.getElementById('install-banner').classList.remove('show');
+  });
+  function installApp() {
+    if (deferredPrompt) {
+      deferredPrompt.prompt();
+      deferredPrompt.userChoice.then(() => {
+        deferredPrompt = null;
+        document.getElementById('install-banner').classList.remove('show');
+      });
+    }
+  }
+
+  // Calculator logic
+  const screen  = document.getElementById('screen');
+  const history = document.getElementById('history');
+  let current = '0', previous = null, operator = null, justEvaluated = false;
+
+  function setScreen(val) {
+    const s = String(val);
+    screen.classList.remove('small','xsmall','error');
+    if (s.length > 12) screen.classList.add('xsmall');
+    else if (s.length > 9) screen.classList.add('small');
+    screen.textContent = s;
+  }
+
+  function fmtNum(n) {
+    const s = String(n);
+    if (s.includes('e') || s.includes('E')) return parseFloat(n.toPrecision(9)).toString();
+    const [int, dec] = s.split('.');
+    const f = parseFloat(int).toLocaleString('en-US');
+    return dec !== undefined ? `${f}.${dec}` : f;
+  }
+
+  function compute() {
+    const a = parseFloat(previous), b = parseFloat(current);
+    if (isNaN(a) || isNaN(b)) return b;
+    switch(operator) {
+      case '+': return a + b;
+      case '−': return a - b;
+      case '×': return a * b;
+      case '÷': return b === 0 ? null : a / b;
+    }
+    return b;
+  }
+
+  function showError() {
+    screen.textContent = 'Error';
+    screen.classList.add('error');
+    setTimeout(() => { screen.classList.remove('error'); setScreen('0'); }, 600);
+    current = '0'; previous = null; operator = null; justEvaluated = false;
+  }
+
+  document.querySelector('.keys').addEventListener('click', e => {
+    const btn = e.target.closest('button');
+    if (!btn) return;
+    const action = btn.dataset.action;
+
+    if (action === 'num') {
+      const n = btn.dataset.num;
+      if (justEvaluated) { current = n; justEvaluated = false; }
+      else current = (current === '0') ? n : (current.length < 12 ? current + n : current);
+      setScreen(current);
+    }
+    else if (action === 'decimal') {
+      if (justEvaluated) { current = '0.'; justEvaluated = false; }
+      else if (!current.includes('.')) current += '.';
+      setScreen(current);
+    }
+    else if (action === 'op') {
+      const op = btn.dataset.op;
+      if (operator && !justEvaluated) {
+        const r = compute();
+        if (r === null) { showError(); return; }
+        previous = String(r);
+        history.textContent = `${fmtNum(r)} ${op}`;
+      } else {
+        previous = current;
+        history.textContent = `${fmtNum(parseFloat(current))} ${op}`;
+      }
+      operator = op; justEvaluated = false;
+      setScreen(fmtNum(parseFloat(previous)));
+    }
+    else if (action === 'equals') {
+      if (!operator || previous === null) return;
+      history.textContent = `${fmtNum(parseFloat(previous))} ${operator} ${fmtNum(parseFloat(current))} =`;
+      const r = compute();
+      if (r === null) { showError(); return; }
+      current = String(r); operator = null; previous = null; justEvaluated = true;
+      setScreen(fmtNum(r));
+    }
+    else if (action === 'clear') {
+      current = '0'; previous = null; operator = null; justEvaluated = false;
+      history.textContent = ''; setScreen('0');
+    }
+    else if (action === 'sign') { current = String(parseFloat(current) * -1); setScreen(current); }
+    else if (action === 'percent') { current = String(parseFloat(current) / 100); setScreen(current); }
+  });
+</script>
+</body>
+</html>
